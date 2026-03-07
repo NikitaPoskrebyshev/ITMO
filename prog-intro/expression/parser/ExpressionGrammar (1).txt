@@ -1,0 +1,57 @@
+/* 
+* or expression                                 -modification-
+*       xor expression                          -modification- 
+*       xor expression '|' or expression        -modification-
+* xor expression                                -modification-
+*       and expression                          -modification-
+*       and expression '^' xor expression       -modification-
+* and expression                                -modification-
+*       expression                              -modification-
+*       expression '&' and expression           -modification-
+* expression
+*       term
+*       term '+' expression
+*       term '-' exp    ression
+* term
+*       factor
+*       factor '*' term
+*       factor '/' term
+* factor
+*       const
+*       variable
+*       '(' expression ')'
+*       '-' factor
+*       "l1" factor                             -modification-
+*       "t1" factor                             -modification-
+* const
+*      integer
+* integer
+*     digit
+*     onenine digits
+*     '-' digit
+*     '-' onenine digits
+*
+* onenine
+*     '1' . '9'
+* digits
+*     digit
+*     digit digits
+*
+* digit
+*     '0'
+*     onenine
+* variable
+*      'x'
+*      'y'
+*      'z'
+* ws
+*       a Unicode space character (SPACE_SEPARATOR, LINE_SEPARATOR, or PARAGRAPH_SEPARATOR) but is not also a non-breaking space ('\u00A0', '\u2007', '\u202F').
+*       '\t', U+0009 HORIZONTAL TABULATION.
+*       '\n', U+000A LINE FEED.
+*       '\u000B', U+000B VERTICAL TABULATION.
+*       '\f', U+000C FORM FEED.
+*       '\r', U+000D CARRIAGE RETURN.
+*       '\u001C', U+001C FILE SEPARATOR.
+*       '\u001D', U+001D GROUP SEPARATOR.
+*       '\u001E', U+001E RECORD SEPARATOR.
+*       '\u001F', U+001F UNIT SEPARATOR.

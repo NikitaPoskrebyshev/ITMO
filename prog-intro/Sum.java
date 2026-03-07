@@ -1,0 +1,30 @@
+
+public class Sum {
+    
+    public static void main(String[] args) {
+        
+        int ans = 0;
+
+        for (String arg : args) {
+            int argSize = arg.length();
+
+            int l = 0, r = 0;
+            while (l < argSize) {
+                char c = arg.charAt(l);
+                if (!Character.isWhitespace(c)) {
+                    r = l + 1;
+                    while (r < argSize && !Character.isWhitespace(arg.charAt(r))) {
+                        r++;
+                    }
+                    int number = Integer.parseInt(arg.substring(l, r));
+                    ans += number;
+                    l = r;
+                    continue;
+                }
+                l++;
+            }
+        }
+        
+        System.out.println(ans);
+    }
+}
