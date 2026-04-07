@@ -1,0 +1,12 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[bot_service]
+base_url = "http://localhost:8081"
+
+[scheduler]
+interval_seconds = 60
+
+[http]
+timeout_seconds = 10

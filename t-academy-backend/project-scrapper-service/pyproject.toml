@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "backend-academy-2026-python-template"
+version = "0.1.0"
+description = ""
+package-mode = false
+authors = ["g.tarasov <g.tarasov@tbank.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+httpx = "^0.27.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8.0"
+isort = "^5.13.2"
+ruff = "^0.6.1"
+pytest = "*"
+pytest-cov = "*"
+pytest-deadfixtures = "*"
+pytest-mock = "*"
+pytest-repeat = "*"
+pytest-asyncio = "*"
+mypy = "^1.19.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+[tool.mypy]
+# Расскомментируйте следующую строку, если используете Pydantic
+# plugins = ['pydantic.mypy']
+allow_redefinition = true
+ignore_missing_imports = true
+no_implicit_optional = true
+strict_equality = true
+warn_unused_ignores = true
+exclude = "^(.*/)?test_[\\w]*\\.py$|conftest\\.py|tests"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

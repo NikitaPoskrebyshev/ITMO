@@ -1,0 +1,11 @@
+[telegram]
+token = "TELEGRAM_TOKEN"
+polling_timeout_seconds = 30
+
+[scrapper]
+base_url = "http://localhost:8080"
+timeout_seconds = 10
+
+[server]
+host = "0.0.0.0"
+port = 8081
