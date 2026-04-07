@@ -1,5 +1,12 @@
+import heapq
 from abc import abstractmethod, ABC
 import typing as tp
+from itertools import groupby
+import string
+from copy import deepcopy
+from collections import defaultdict
+import re
+
 
 TRow = dict[str, tp.Any]
 TRowsIterable = tp.Iterable[TRow]
@@ -42,7 +49,6 @@ class Mapper(ABC):
         """
         :param row: one table row
         """
-        pass
 
 
 class Map(Operation):
@@ -50,7 +56,8 @@ class Map(Operation):
         self.mapper = mapper
 
     def __call__(self, rows: TRowsIterable, *args: tp.Any, **kwargs: tp.Any) -> TRowsGenerator:
-        pass
+        for row in rows:
+            yield from self.mapper(row)
 
 
 class Reducer(ABC):
@@ -60,7 +67,6 @@ class Reducer(ABC):
         """
         :param rows: table rows
         """
-        pass
 
 
 class Reduce(Operation):
@@ -69,7 +75,8 @@ class Reduce(Operation):
         self.keys = keys
 
     def __call__(self, rows: TRowsIterable, *args: tp.Any, **kwargs: tp.Any) -> TRowsGenerator:
-        pass
+        for key, groupby_items in groupby(rows, key=lambda row: [row[k] for k in self.keys]):
+            yield from self.reducer(tuple(self.keys), groupby_items)
 
 
 class Joiner(ABC):
@@ -85,7 +92,6 @@ class Joiner(ABC):
         :param rows_a: left table rows
         :param rows_b: right table rows
         """
-        pass
 
 
 class Join(Operation):
@@ -93,8 +99,31 @@ class Join(Operation):
         self.keys = keys
         self.joiner = joiner
 
+    @staticmethod
+    def _next(data: tp.Iterator[tp.Any]) -> tp.Any:
+        try:
+            return next(data)
+        except StopIteration:
+            return None
+
     def __call__(self, rows: TRowsIterable, *args: tp.Any, **kwargs: tp.Any) -> TRowsGenerator:
-        pass
+        data_left = groupby(rows, key=lambda row: [row[k] for k in self.keys])
+        data_right = groupby(args[0], key=lambda row: [row[k] for k in self.keys])
+
+        left_group = self._next(data_left)
+        right_group = self._next(data_right)
+
+        while left_group is not None or right_group is not None:
+            if (right_group is None) or (left_group is not None and left_group[0] < right_group[0]):
+                yield from self.joiner(self.keys, left_group[1], [])
+                left_group = self._next(data_left)
+            elif (left_group is None) or (right_group is not None and left_group[0] > right_group[0]):
+                yield from self.joiner(self.keys, [], right_group[1])
+                right_group = self._next(data_right)
+            else:
+                yield from self.joiner(self.keys, left_group[1], right_group[1])
+                left_group = self._next(data_left)
+                right_group = self._next(data_right)
 
 
 # Dummy operators
@@ -103,13 +132,15 @@ class Join(Operation):
 class DummyMapper(Mapper):
     """Yield exactly the row passed"""
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        yield row
 
 
 class FirstReducer(Reducer):
     """Yield only first row from passed ones"""
     def __call__(self, group_key: tuple[str, ...], rows: TRowsIterable) -> TRowsGenerator:
-        pass
+        for row in rows:
+            yield row
+            break
 
 
 # Mappers
@@ -124,7 +155,8 @@ class FilterPunctuation(Mapper):
         self.column = column
 
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        row[self.column] = row[self.column].translate(str.maketrans('', '', string.punctuation))
+        yield row
 
 
 class LowerCase(Mapper):
@@ -136,11 +168,12 @@ class LowerCase(Mapper):
         self.column = column
 
     @staticmethod
-    def _lower_case(txt: str):
+    def _lower_case(txt: str) -> str:
         return txt.lower()
 
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        row[self.column] = self._lower_case(row[self.column])
+        yield row
 
 
 class Split(Mapper):
@@ -154,7 +187,15 @@ class Split(Mapper):
         self.separator = separator
 
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        for entrance in re.finditer(r"[A-Za-z']+", row[self.column]):
+            word = entrance.group(0)
+            new_row: TRow = dict()
+            for key in row.keys():
+                if key != self.column:
+                    new_row[key] = row[key]
+                else:
+                    new_row[self.column] = word
+            yield deepcopy(new_row)
 
 
 class Product(Mapper):
@@ -168,7 +209,11 @@ class Product(Mapper):
         self.result_column = result_column
 
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        new_row = deepcopy(row)
+        new_row[self.result_column] = 1
+        for column in self.columns:
+            new_row[self.result_column] *= row[column]
+        yield new_row
 
 
 class Filter(Mapper):
@@ -180,7 +225,8 @@ class Filter(Mapper):
         self.condition = condition
 
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        if self.condition(row):
+            yield row
 
 
 class Project(Mapper):
@@ -192,7 +238,26 @@ class Project(Mapper):
         self.columns = columns
 
     def __call__(self, row: TRow) -> TRowsGenerator:
-        pass
+        new_row: TRow = dict()
+        for column in self.columns:
+            new_row[column] = deepcopy(row[column])
+        yield new_row
+
+
+class Apply(Mapper):
+    """Apply function to row"""
+
+    def __init__(self, func: tp.Callable[[TRow], tp.Any], result_column: str) -> None:
+        """
+        :param func: function to apply
+        :param result_column: column name to save func result in
+        """
+        self.func = func
+        self.result_column = result_column
+
+    def __call__(self, row: TRow) -> TRowsGenerator:
+        row[self.result_column] = self.func(row)
+        yield row
 
 
 # Reducers
@@ -209,7 +274,7 @@ class TopN(Reducer):
         self.n = n
 
     def __call__(self, group_key: tuple[str, ...], rows: TRowsIterable) -> TRowsGenerator:
-        pass
+        yield from heapq.nlargest(self.n, rows, key=lambda row: row[self.column_max])
 
 
 class TermFrequency(Reducer):
@@ -223,7 +288,22 @@ class TermFrequency(Reducer):
         self.result_column = result_column
 
     def __call__(self, group_key: tuple[str, ...], rows: TRowsIterable) -> TRowsGenerator:
-        pass
+        word_count: dict[str, int] = defaultdict(int)
+        rows_size: int = 0
+        once: bool = True
+        result_row: TRow = dict()
+        for row in rows:
+            rows_size += 1
+            word_count[row[self.words_column]] += 1
+            if once:
+                once = False
+                for key in group_key:
+                    result_row[key] = row[key]
+
+        for word, count in word_count.items():
+            result_row[self.words_column] = word
+            result_row[self.result_column] = count / rows_size
+            yield deepcopy(result_row)
 
 
 class Count(Reducer):
@@ -242,7 +322,17 @@ class Count(Reducer):
         self.column = column
 
     def __call__(self, group_key: tuple[str, ...], rows: TRowsIterable) -> TRowsGenerator:
-        pass
+        rows_size: int = 0
+        once: bool = True
+        result_row: TRow = dict()
+        for row in rows:
+            rows_size += 1
+            if once:
+                once = False
+                for key in group_key:
+                    result_row[key] = row[key]
+        result_row[self.column] = rows_size
+        yield deepcopy(result_row)
 
 
 class Sum(Reducer):
@@ -261,7 +351,17 @@ class Sum(Reducer):
         self.column = column
 
     def __call__(self, group_key: tuple[str, ...], rows: TRowsIterable) -> TRowsGenerator:
-        pass
+        once: bool = True
+        total_sum: int = 0
+        result_row: TRow = dict()
+        for row in rows:
+            total_sum += row[self.column]
+            if once:
+                once = False
+                for key in group_key:
+                    result_row[key] = row[key]
+        result_row[self.column] = total_sum
+        yield deepcopy(result_row)
 
 
 # Joiners
@@ -270,22 +370,51 @@ class Sum(Reducer):
 class InnerJoiner(Joiner):
     """Join with inner strategy"""
     def __call__(self, keys: tp.Sequence[str], rows_a: TRowsIterable, rows_b: TRowsIterable) -> TRowsGenerator:
-        pass
+        rows_b_list = list(rows_b)
+        for row_a in rows_a:
+            for row_b in rows_b_list:
+                new_row = deepcopy(row_b)
+                common_columns: set[str] = set(row_a.keys()) & set(row_b.keys()) - set(keys)
+                for col in common_columns:
+                    row_a[col + self._a_suffix] = row_a.pop(col)
+                    new_row[col + self._b_suffix] = new_row.pop(col)
+                new_row.update(row_a)
+                yield new_row
 
 
 class OuterJoiner(Joiner):
     """Join with outer strategy"""
     def __call__(self, keys: tp.Sequence[str], rows_a: TRowsIterable, rows_b: TRowsIterable) -> TRowsGenerator:
-        pass
+        rows_b_list = list(rows_b)
+        if not rows_a:
+            yield from rows_b_list
+        if not rows_b_list:
+            yield from rows_a
+        for row_a in rows_a:
+            for row_b in rows_b_list:
+                row_a.update(row_b)
+                yield row_a
 
 
 class LeftJoiner(Joiner):
     """Join with left strategy"""
     def __call__(self, keys: tp.Sequence[str], rows_a: TRowsIterable, rows_b: TRowsIterable) -> TRowsGenerator:
-        pass
+        rows_b_list = list(rows_b)
+        if not rows_b_list:
+            yield from rows_a
+        for row_a in rows_a:
+            for row_b in rows_b_list:
+                row_a.update(row_b)
+                yield deepcopy(row_a)
 
 
 class RightJoiner(Joiner):
     """Join with right strategy"""
     def __call__(self, keys: tp.Sequence[str], rows_a: TRowsIterable, rows_b: TRowsIterable) -> TRowsGenerator:
-        pass
+        rows_a_list = list(rows_a)
+        if not rows_a_list:
+            yield from rows_b
+        for row_b in rows_b:
+            for row_a in rows_a_list:
+                row_b.update(row_a)
+                yield deepcopy(row_b)

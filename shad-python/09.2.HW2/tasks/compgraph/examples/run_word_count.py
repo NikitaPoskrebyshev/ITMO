@@ -1,21 +1,18 @@
 import click
+import json
 
 from compgraph.algorithms import word_count_graph
 
 
-# TODO: cli
-# You can use anything you want. We suggest you to use `click`
-def main() -> None:
-    graph = word_count_graph(input_stream_name="input", text_column='text', count_column='count')
-
-    input_filepath = None
-    output_filepath = None
-
-    result = graph.run(input=lambda: input_filepath)
-    with open(output_filepath, "w") as out:
-        for row in result:
-            print(row, file=out)
+@click.command()
+@click.argument('input_file', nargs=1)
+@click.argument('output_file', nargs=1)
+def run_word_count_graph(input_file: str, output_file: str) -> None:
+    graph = word_count_graph(input_stream_name=input_file, text_column='text', count_column='count', from_file=True)
+    result = graph.run()
+    with open(output_file, 'w') as out:
+        json.dump(list(result), out)
 
 
 if __name__ == "__main__":
-    main()
+    run_word_count_graph()
