@@ -3,10 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
-# --- Domain models (internal) ---
+@dataclass(slots=True)
+class UpdateInfo:
+    update_type: str
+    title: str
+    author: str
+    created_at: str
+    preview: str
+    new_timestamp: str
+
 
 @dataclass(slots=True)
 class TrackedLink:
@@ -14,15 +22,15 @@ class TrackedLink:
     link_type: str  # "github" | "stackoverflow"
     chat_ids: set[int] = field(default_factory=set)
     tags: list[str] = field(default_factory=list)
+    filters: list[str] = field(default_factory=list)
     last_checked_at: datetime | None = None
     last_known_update: str | None = None
 
 
-# --- HTTP request/response models ---
-
 class AddLinkRequest(BaseModel):
     link: str
     tags: list[str] = []
+    filters: list[str] = []
 
 
 class RemoveLinkRequest(BaseModel):
@@ -33,6 +41,7 @@ class LinkResponse(BaseModel):
     id: int
     url: str
     tags: list[str]
+    filters: list[str]
 
 
 class ListLinksResponse(BaseModel):
@@ -44,12 +53,15 @@ class LinkUpdate(BaseModel):
     id: int
     url: str
     description: str
-    tg_chat_ids: list[int]
+    tg_chat_ids: list[int] = Field(serialization_alias="tgChatIds")
 
 
 class ApiErrorResponse(BaseModel):
-    description: str
-    code: str
+    description: str | None = None
+    code: str | None = None
+    exception_name: str | None = Field(None, alias="exceptionName")
+    exception_message: str | None = Field(None, alias="exceptionMessage")
+    stacktrace: list[str] = []
 
 
 def link_to_response(link: TrackedLink) -> LinkResponse:
@@ -57,4 +69,5 @@ def link_to_response(link: TrackedLink) -> LinkResponse:
         id=abs(hash(link.url)),
         url=link.url,
         tags=link.tags,
+        filters=link.filters,
     )

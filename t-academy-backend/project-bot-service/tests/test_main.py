@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from bot.config import AppConfig, ScrapperConfig, ServerConfig, TelegramConfig
+from bot.config import AppConfig, TelegramConfig
 from main import main
 
 
@@ -14,17 +14,18 @@ def test_main_builds_application_and_runs(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         "main.load_config",
         lambda: AppConfig(
-            telegram=TelegramConfig(token="test-token", polling_timeout_seconds=15),
-            scrapper=ScrapperConfig(base_url="http://scrapper:8080", timeout_seconds=5),
-            server=ServerConfig(host="0.0.0.0", port=8081),
+            telegram=TelegramConfig(token="test-token", polling_timeout_seconds=15)
         ),
     )
 
     captured: dict[str, object] = {}
 
     class FakeBotApplication:
-        def __init__(self, **kwargs) -> None:
-            captured.update(kwargs)
+        def __init__(
+            self, token: str, polling_timeout_seconds: int, **kwargs: object
+        ) -> None:
+            captured["token"] = token
+            captured["polling_timeout_seconds"] = polling_timeout_seconds
 
         def run(self) -> None:
             captured["run_called"] = True
@@ -33,7 +34,8 @@ def test_main_builds_application_and_runs(monkeypatch, tmp_path: Path) -> None:
 
     main()
 
-    assert captured["token"] == "test-token"
-    assert captured["polling_timeout_seconds"] == 15
-    assert captured["scrapper_base_url"] == "http://scrapper:8080"
-    assert captured["run_called"] is True
+    assert captured == {
+        "token": "test-token",
+        "polling_timeout_seconds": 15,
+        "run_called": True,
+    }

@@ -26,6 +26,8 @@ def main() -> None:
         scrapper_timeout_seconds=config.scrapper.timeout_seconds,
         server_host=config.server.host,
         server_port=config.server.port,
+        db_dsn=config.database.dsn,
+        db_access_type=config.database.access_type,
     )
     logger.info(
         "Bot application initialized",

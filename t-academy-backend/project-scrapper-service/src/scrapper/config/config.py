@@ -23,6 +23,7 @@ class BotServiceConfig:
 @dataclass(frozen=True, slots=True)
 class SchedulerConfig:
     interval_seconds: int = 60
+    batch_size: int = 100
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,11 +32,18 @@ class HttpConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class DatabaseConfig:
+    dsn: str = "postgresql://scrapper:scrapper@localhost:5432/scrapper"
+    access_type: str = "SQL"  # "SQL" or "ORM"
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     server: ServerConfig = field(default_factory=ServerConfig)
     bot_service: BotServiceConfig = field(default_factory=BotServiceConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     http: HttpConfig = field(default_factory=HttpConfig)
+    database: DatabaseConfig | None = None
 
 
 DEFAULT_CONFIG_PATH = Path("config.toml")
@@ -52,6 +60,16 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
     bot_service = data.get("bot_service", {})
     scheduler = data.get("scheduler", {})
     http = data.get("http", {})
+    db_raw = data.get("database")
+
+    database = None
+    if db_raw is not None:
+        database = DatabaseConfig(
+            dsn=db_raw.get(
+                "dsn", "postgresql://scrapper:scrapper@localhost:5432/scrapper"
+            ),
+            access_type=db_raw.get("access-type", "SQL").upper(),
+        )
 
     return AppConfig(
         server=ServerConfig(
@@ -63,8 +81,10 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
         ),
         scheduler=SchedulerConfig(
             interval_seconds=int(scheduler.get("interval_seconds", 60)),
+            batch_size=int(scheduler.get("batch_size", 100)),
         ),
         http=HttpConfig(
             timeout_seconds=int(http.get("timeout_seconds", 10)),
         ),
+        database=database,
     )

@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class ChatRepository(Protocol):
+    async def register(self, chat_id: int) -> None: ...
+    async def exists(self, chat_id: int) -> bool: ...
+    async def delete(self, chat_id: int) -> None: ...
+    async def all(self, limit: int = 100, offset: int = 0) -> list[int]: ...
 
 
 @dataclass(slots=True)
@@ -15,28 +24,50 @@ class InMemoryUserRepository:
         self._started_users.add(user_id)
 
 
-class TrackDialogState(Enum):
-    IDLE = auto()
-    WAITING_FOR_TRACK_URL = auto()
-    WAITING_FOR_TRACK_TAGS = auto()
-    WAITING_FOR_UNTRACK_URL = auto()
-
-
 @dataclass(slots=True)
-class TrackSession:
-    state: TrackDialogState = TrackDialogState.IDLE
-    pending_url: str | None = None
+class InMemoryChatRepository:
+    _chats: set[int] = field(default_factory=set)
+
+    async def register(self, chat_id: int) -> None:
+        self._chats.add(chat_id)
+
+    async def exists(self, chat_id: int) -> bool:
+        return chat_id in self._chats
+
+    async def delete(self, chat_id: int) -> None:
+        self._chats.discard(chat_id)
+
+    async def all(self, limit: int = 100, offset: int = 0) -> list[int]:
+        return sorted(self._chats)[offset : offset + limit]
 
 
-@dataclass(slots=True)
-class InMemoryTrackStateRepository:
-    _sessions: dict[int, TrackSession] = field(default_factory=dict)
+MIGRATIONS_DIR = Path(__file__).parent.parent.parent / "migrations"
 
-    def get_session(self, chat_id: int) -> TrackSession:
-        return self._sessions.get(chat_id, TrackSession())
 
-    def set_session(self, chat_id: int, session: TrackSession) -> None:
-        self._sessions[chat_id] = session
+async def run_migrations(dsn: str) -> None:
+    import asyncpg
 
-    def clear_session(self, chat_id: int) -> None:
-        self._sessions.pop(chat_id, None)
+    conn = await asyncpg.connect(dsn)
+    try:
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                filename TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ DEFAULT now()
+            )
+            """
+        )
+        migration_files = sorted(MIGRATIONS_DIR.glob("*.sql"))
+        for path in migration_files:
+            already_applied = await conn.fetchval(
+                "SELECT 1 FROM schema_migrations WHERE filename = $1", path.name
+            )
+            if already_applied:
+                continue
+            sql = path.read_text(encoding="utf-8")
+            await conn.execute(sql)
+            await conn.execute(
+                "INSERT INTO schema_migrations (filename) VALUES ($1)", path.name
+            )
+    finally:
+        await conn.close()

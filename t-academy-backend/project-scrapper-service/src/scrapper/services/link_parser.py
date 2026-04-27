@@ -22,7 +22,9 @@ class StackOverflowLink:
 
 
 _GITHUB_PATTERN = re.compile(r"^https://github\.com/([^/]+)/([^/?#]+?)(?:\.git)?/?$")
-_STACKOVERFLOW_PATTERN = re.compile(r"^https://stackoverflow\.com/questions/(\d+)(?:/[^?#]*)?/?$")
+_STACKOVERFLOW_PATTERN = re.compile(
+    r"^https://stackoverflow\.com/questions/(\d+)(?:/[^?#]*)?/?$"
+)
 
 
 def parse_link(url: str) -> GitHubLink | StackOverflowLink:

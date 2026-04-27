@@ -28,10 +28,17 @@ class ServerConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class DatabaseConfig:
+    dsn: str = "postgresql://bot:bot@localhost:5432/bot"
+    access_type: str = "SQL"  # "SQL" or "ORM"
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     telegram: TelegramConfig
     scrapper: ScrapperConfig = field(default_factory=ScrapperConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
+    database: DatabaseConfig = field(default_factory=DatabaseConfig)
 
 
 DEFAULT_CONFIG_PATH = Path("config.toml")
@@ -60,12 +67,8 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
         raise ConfigError("telegram.polling_timeout_seconds must be a positive integer")
 
     scrapper_section = raw_config.get("scrapper", {})
-    scrapper_base_url = scrapper_section.get("base_url", "http://localhost:8080")
-    scrapper_timeout = scrapper_section.get("timeout_seconds", 10)
-
     server_section = raw_config.get("server", {})
-    server_host = server_section.get("host", "0.0.0.0")
-    server_port = server_section.get("port", 8081)
+    database_section = raw_config.get("database", {})
 
     return AppConfig(
         telegram=TelegramConfig(
@@ -73,11 +76,15 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
             polling_timeout_seconds=polling_timeout_seconds,
         ),
         scrapper=ScrapperConfig(
-            base_url=scrapper_base_url,
-            timeout_seconds=scrapper_timeout,
+            base_url=scrapper_section.get("base_url", "http://localhost:8080"),
+            timeout_seconds=int(scrapper_section.get("timeout_seconds", 10)),
         ),
         server=ServerConfig(
-            host=server_host,
-            port=server_port,
+            host=server_section.get("host", "0.0.0.0"),
+            port=int(server_section.get("port", 8081)),
+        ),
+        database=DatabaseConfig(
+            dsn=database_section.get("dsn", "postgresql://bot:bot@localhost:5432/bot"),
+            access_type=database_section.get("access-type", "SQL").upper(),
         ),
     )

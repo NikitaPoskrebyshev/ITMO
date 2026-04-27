@@ -1,4 +1,3 @@
-import pytest
 from httpx import AsyncClient
 
 CHAT_ID = 42
@@ -55,20 +54,24 @@ async def test_add_link_to_nonexistent_chat_returns_404(client: AsyncClient) -> 
     assert response.status_code == 404
 
 
-async def test_add_duplicate_link_returns_400(client: AsyncClient) -> None:
+async def test_add_duplicate_link_returns_409(client: AsyncClient) -> None:
     await _register(client)
-    await client.post("/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)})
+    await client.post(
+        "/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)}
+    )
     response = await client.post(
         "/links",
         json={"link": GITHUB_URL},
         headers={"Tg-Chat-Id": str(CHAT_ID)},
     )
-    assert response.status_code == 400
+    assert response.status_code == 409
 
 
 async def test_list_links(client: AsyncClient) -> None:
     await _register(client)
-    await client.post("/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)})
+    await client.post(
+        "/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)}
+    )
     response = await client.get("/links", headers={"Tg-Chat-Id": str(CHAT_ID)})
     assert response.status_code == 200
     data = response.json()
@@ -90,7 +93,9 @@ async def test_list_links_nonexistent_chat_returns_404(client: AsyncClient) -> N
 
 async def test_remove_link(client: AsyncClient) -> None:
     await _register(client)
-    await client.post("/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)})
+    await client.post(
+        "/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)}
+    )
     response = await client.request(
         "DELETE",
         "/links",
@@ -103,8 +108,15 @@ async def test_remove_link(client: AsyncClient) -> None:
 
 async def test_remove_link_then_list_is_empty(client: AsyncClient) -> None:
     await _register(client)
-    await client.post("/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)})
-    await client.request("DELETE", "/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)})
+    await client.post(
+        "/links", json={"link": GITHUB_URL}, headers={"Tg-Chat-Id": str(CHAT_ID)}
+    )
+    await client.request(
+        "DELETE",
+        "/links",
+        json={"link": GITHUB_URL},
+        headers={"Tg-Chat-Id": str(CHAT_ID)},
+    )
     response = await client.get("/links", headers={"Tg-Chat-Id": str(CHAT_ID)})
     assert response.json()["size"] == 0
 

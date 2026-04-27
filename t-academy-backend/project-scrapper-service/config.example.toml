@@ -7,6 +7,11 @@ base_url = "http://localhost:8081"
 
 [scheduler]
 interval_seconds = 60
+batch_size = 100
 
 [http]
 timeout_seconds = 10
+
+[database]
+dsn = "postgresql://scrapper:scrapper@localhost:5432/scrapper"
+access-type = "SQL"  # "SQL" or "ORM"

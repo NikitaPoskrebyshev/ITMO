@@ -7,10 +7,28 @@ class KeyValueFormatter(logging.Formatter):
     """Key value formatter."""
 
     _reserved_fields = {
-        "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-        "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-        "created", "msecs", "relativeCreated", "thread", "threadName",
-        "processName", "process", "message", "asctime",
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "message",
+        "asctime",
     }
 
     def format(self, record: logging.LogRecord) -> str:
@@ -28,6 +46,7 @@ class KeyValueFormatter(logging.Formatter):
 def configure_logging() -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(KeyValueFormatter())
+
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
     root_logger.addHandler(handler)

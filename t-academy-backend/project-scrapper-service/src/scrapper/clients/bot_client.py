@@ -18,10 +18,10 @@ class BotClient:
         url = f"{self._base_url}/updates"
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.post(url, json=update.model_dump())
+                response = await client.post(url, json=update.model_dump(by_alias=True))
             if response.status_code not in (200, 201, 204):
                 logger.warning(
-                    "bot_client_non_2xx",
+                    "bot_client_bad_status_code",
                     extra={"status": response.status_code, "url": url},
                 )
         except Exception as exc:

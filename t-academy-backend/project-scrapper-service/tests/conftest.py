@@ -4,7 +4,6 @@ from httpx import ASGITransport, AsyncClient
 
 from scrapper.app import create_app
 from scrapper.config.config import AppConfig
-from scrapper.repositories.repository import InMemoryRepository
 
 
 @pytest.fixture
@@ -21,10 +20,7 @@ def app(config: AppConfig, mocker):  # type: ignore[no-untyped-def]
 
 @pytest_asyncio.fixture
 async def client(app) -> AsyncClient:  # type: ignore[misc]
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as c:
         yield c
-
-
-@pytest.fixture
-def repository() -> InMemoryRepository:
-    return InMemoryRepository()

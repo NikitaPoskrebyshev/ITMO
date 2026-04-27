@@ -22,7 +22,9 @@ def test_parse_github_link_with_trailing_slash() -> None:
 
 
 def test_parse_stackoverflow_link_with_slug() -> None:
-    result = parse_link("https://stackoverflow.com/questions/11227809/why-is-sorted-faster")
+    result = parse_link(
+        "https://stackoverflow.com/questions/11227809/why-is-sorted-faster"
+    )
     assert isinstance(result, StackOverflowLink)
     assert result.question_id == 11227809
 

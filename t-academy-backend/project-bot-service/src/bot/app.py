@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING
 
-from bot.handlers import BotHandlers
-from bot.repositories import InMemoryTrackStateRepository, InMemoryUserRepository
-from bot.scrapper_client import ScrapperHttpClient
-from bot.web_server import UpdatesServer
+import uvicorn
+
+from .clients import ScrapperHttpClient
+from .handlers import BotHandlers
+from .http_server import create_updates_app
+from .models import LinkUpdate
+from .repositories import InMemoryUserRepository, run_migrations
+from .state import InMemoryStateRepository
 
 if TYPE_CHECKING:
     from telegram.ext import Application
+
+
+logger = logging.getLogger(__name__)
 
 
 class BotApplication:
@@ -21,25 +29,26 @@ class BotApplication:
         scrapper_timeout_seconds: int = 10,
         server_host: str = "0.0.0.0",
         server_port: int = 8081,
+        db_dsn: str = "postgresql://bot:bot@localhost:5432/bot",
+        db_access_type: str = "SQL",
     ) -> None:
         self._token = token
         self._polling_timeout_seconds = polling_timeout_seconds
-        self._scrapper_base_url = scrapper_base_url
-        self._scrapper_timeout_seconds = scrapper_timeout_seconds
-        self._server_host = server_host
-        self._server_port = server_port
-
         self._user_repository = InMemoryUserRepository()
-        self._track_state_repository = InMemoryTrackStateRepository()
+        self._state_repository = InMemoryStateRepository()
         self._scrapper_client = ScrapperHttpClient(
             base_url=scrapper_base_url,
             timeout_seconds=scrapper_timeout_seconds,
         )
         self._handlers = BotHandlers(
             user_repository=self._user_repository,
-            track_state_repository=self._track_state_repository,
             scrapper_client=self._scrapper_client,
+            state_repository=self._state_repository,
         )
+        self._server_host = server_host
+        self._server_port = server_port
+        self._db_dsn = db_dsn
+        self._db_access_type = db_access_type.upper()
 
     def build(self) -> Application:
         from telegram.ext import (
@@ -49,36 +58,92 @@ class BotApplication:
             filters,
         )
 
-        server_host = self._server_host
-        server_port = self._server_port
-
-        async def post_init(application: Application) -> None:
-            server = UpdatesServer(
-                host=server_host,
-                port=server_port,
-                bot=application.bot,
-            )
-            asyncio.ensure_future(server.serve())
-
-        application = ApplicationBuilder().token(self._token).post_init(post_init).build()
-
+        application = ApplicationBuilder().token(self._token).build()
         application.add_handler(CommandHandler("start", self._handlers.start))
         application.add_handler(CommandHandler("help", self._handlers.help_command))
+        application.add_handler(CommandHandler("cancel", self._handlers.cancel))
         application.add_handler(CommandHandler("track", self._handlers.track))
         application.add_handler(CommandHandler("untrack", self._handlers.untrack))
         application.add_handler(CommandHandler("list", self._handlers.list_links))
-        application.add_handler(CommandHandler("cancel", self._handlers.cancel))
         application.add_handler(
-            MessageHandler(
-                filters.TEXT & ~filters.COMMAND,
-                self._handlers.handle_text,
-            )
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self._handlers.handle_text)
         )
         application.add_handler(
             MessageHandler(filters.COMMAND, self._handlers.unknown_command)
         )
         return application
 
+    async def _on_update(self, update: LinkUpdate) -> None:
+        from telegram import Bot
+
+        bot = Bot(token=self._token)
+        text = f"Обновление по ссылке:\n{update.url}\n\n{update.description}"
+        for chat_id in update.tg_chat_ids:
+            try:
+                await bot.send_message(chat_id=chat_id, text=text)
+            except Exception as exc:
+                logger.warning(
+                    "send_update_failed",
+                    extra={
+                        "event": "send_update_failed",
+                        "chat_id": chat_id,
+                        "error": str(exc),
+                    },
+                )
+
+    async def _create_chat_repository(self):
+        await run_migrations(self._db_dsn)
+
+        if self._db_access_type == "ORM":
+            from .repositories_orm import (
+                OrmChatRepository,
+                create_orm_engine,
+                create_orm_session_factory,
+            )
+
+            engine = create_orm_engine(self._db_dsn)
+            session_factory = create_orm_session_factory(engine)
+            return OrmChatRepository(session_factory)
+        else:
+            from .repositories_sql import SqlChatRepository, create_sql_pool
+
+            pool = await create_sql_pool(self._db_dsn)
+            return SqlChatRepository(pool)
+
     def run(self) -> None:
+        asyncio.run(self._run_async())
+
+    async def _run_async(self) -> None:
+        await self._create_chat_repository()
+        logger.info(
+            "db_initialized",
+            extra={"event": "db_initialized", "access_type": self._db_access_type},
+        )
+
         application = self.build()
-        application.run_polling(timeout=self._polling_timeout_seconds)
+        fastapi_app = create_updates_app(self._on_update)
+
+        config = uvicorn.Config(
+            fastapi_app,
+            host=self._server_host,
+            port=self._server_port,
+            log_level="error",
+        )
+        http_server = uvicorn.Server(config)
+
+        async with application:
+            await application.start()
+            assert application.updater is not None
+            await application.updater.start_polling(drop_pending_updates=True)
+            logger.info(
+                "bot_started",
+                extra={"event": "bot_started", "server_port": self._server_port},
+            )
+
+            try:
+                await http_server.serve()
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                pass
+            finally:
+                await application.updater.stop()
+                await application.stop()

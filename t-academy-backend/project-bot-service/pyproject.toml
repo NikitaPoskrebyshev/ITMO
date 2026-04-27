@@ -9,6 +9,12 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 python-telegram-bot = "^22.0"
+fastapi = "^0.136.1"
+uvicorn = "^0.46.0"
+httpx = "^0.28.1"
+asyncpg = "^0.31.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.49"}
+greenlet = "^3.4.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -22,6 +28,7 @@ pytest-mock = "*"
 pytest-repeat = "*"
 pytest-asyncio = "*"
 mypy = "^1.19.1"
+testcontainers = {extras = ["postgres"], version = "^4.14.2"}
 
 [build-system]
 requires = ["poetry-core"]
