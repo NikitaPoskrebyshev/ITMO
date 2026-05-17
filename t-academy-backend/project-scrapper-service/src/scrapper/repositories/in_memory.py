@@ -82,9 +82,11 @@ class InMemoryRepository(ScrapperRepository):
             del self._links[url]
         return stored
 
-    async def get_all_links(self, limit: int = 100, offset: int = 0) -> list[TrackedLink]:
+    async def get_all_links(
+        self, limit: int = 100, offset: int = 0
+    ) -> list[TrackedLink]:
         all_links = list(self._links.values())
-        return all_links[offset:offset + limit]
+        return all_links[offset : offset + limit]
 
     async def update_link_state(self, url: str, last_known_update: str) -> None:
         if url in self._links:

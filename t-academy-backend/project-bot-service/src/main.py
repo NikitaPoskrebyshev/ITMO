@@ -28,6 +28,10 @@ def main() -> None:
         server_port=config.server.port,
         db_dsn=config.database.dsn,
         db_access_type=config.database.access_type,
+        notification_transport=config.notification.transport,
+        kafka_bootstrap_servers=config.notification.kafka.bootstrap_servers,
+        kafka_topic=config.notification.kafka.topic,
+        kafka_group_id=config.notification.kafka.group_id,
     )
     logger.info(
         "Bot application initialized",

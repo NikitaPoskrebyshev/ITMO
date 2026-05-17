@@ -34,11 +34,25 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class KafkaConsumerConfig:
+    bootstrap_servers: str = "localhost:9094"
+    topic: str = "link-updates"
+    group_id: str = "bot-service"
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationConfig:
+    transport: str = "http"  # "http" or "kafka"; default "kafka" set in config.toml
+    kafka: KafkaConsumerConfig = field(default_factory=KafkaConsumerConfig)
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     telegram: TelegramConfig
     scrapper: ScrapperConfig = field(default_factory=ScrapperConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
+    notification: NotificationConfig = field(default_factory=NotificationConfig)
 
 
 DEFAULT_CONFIG_PATH = Path("config.toml")
@@ -70,6 +84,9 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
     server_section = raw_config.get("server", {})
     database_section = raw_config.get("database", {})
 
+    notification_section = raw_config.get("notification", {})
+    kafka_section = notification_section.get("kafka", {})
+
     return AppConfig(
         telegram=TelegramConfig(
             token=token,
@@ -86,5 +103,15 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
         database=DatabaseConfig(
             dsn=database_section.get("dsn", "postgresql://bot:bot@localhost:5432/bot"),
             access_type=database_section.get("access-type", "SQL").upper(),
+        ),
+        notification=NotificationConfig(
+            transport=notification_section.get("transport", "http"),
+            kafka=KafkaConsumerConfig(
+                bootstrap_servers=kafka_section.get(
+                    "bootstrap_servers", "localhost:9094"
+                ),
+                topic=kafka_section.get("topic", "link-updates"),
+                group_id=kafka_section.get("group_id", "bot-service"),
+            ),
         ),
     )

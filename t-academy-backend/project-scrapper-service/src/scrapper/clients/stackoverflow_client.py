@@ -12,8 +12,14 @@ logger = logging.getLogger(__name__)
 
 _BASE = "https://api.stackexchange.com/2.3"
 _QUESTION_URL = _BASE + "/questions/{id}?site=stackoverflow"
-_ANSWERS_URL = _BASE + "/questions/{id}/answers?site=stackoverflow&sort=creation&order=desc&filter=withbody"
-_COMMENTS_URL = _BASE + "/questions/{id}/comments?site=stackoverflow&sort=creation&order=desc&filter=withbody"
+_ANSWERS_URL = (
+    _BASE
+    + "/questions/{id}/answers?site=stackoverflow&sort=creation&order=desc&filter=withbody"
+)
+_COMMENTS_URL = (
+    _BASE
+    + "/questions/{id}/comments?site=stackoverflow&sort=creation&order=desc&filter=withbody"
+)
 _PREVIEW_LEN = 200
 
 
@@ -34,7 +40,10 @@ class StackOverflowClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.get(url, params=params)
             if response.status_code != 200:
-                logger.warning("stackoverflow_non_2xx", extra={"status": response.status_code, "url": url})
+                logger.warning(
+                    "stackoverflow_non_2xx",
+                    extra={"status": response.status_code, "url": url},
+                )
                 return None
             return response.json()
         except Exception as exc:
@@ -55,8 +64,12 @@ class StackOverflowClient:
         if since_ts:
             params["fromdate"] = since_ts
 
-        answers_data = await self._get(_ANSWERS_URL.format(id=question_id), params=params)
-        comments_data = await self._get(_COMMENTS_URL.format(id=question_id), params=params)
+        answers_data = await self._get(
+            _ANSWERS_URL.format(id=question_id), params=params
+        )
+        comments_data = await self._get(
+            _COMMENTS_URL.format(id=question_id), params=params
+        )
 
         answers = (answers_data or {}).get("items", [])
         comments = (comments_data or {}).get("items", [])
@@ -76,14 +89,16 @@ class StackOverflowClient:
             author = (answer.get("owner") or {}).get("display_name", "unknown")
             body = _strip_html(answer.get("body", "") or "")[:_PREVIEW_LEN]
             latest_ts = max(latest_ts, created)
-            updates.append(UpdateInfo(
-                update_type="answer",
-                title=f"[Ответ] {question_title}",
-                author=author,
-                created_at=_fmt_unix(created),
-                preview=body,
-                new_timestamp=str(created),
-            ))
+            updates.append(
+                UpdateInfo(
+                    update_type="answer",
+                    title=f"[Ответ] {question_title}",
+                    author=author,
+                    created_at=_fmt_unix(created),
+                    preview=body,
+                    new_timestamp=str(created),
+                )
+            )
 
         for comment in comments:
             created = comment.get("creation_date", 0)
@@ -92,14 +107,16 @@ class StackOverflowClient:
             author = (comment.get("owner") or {}).get("display_name", "unknown")
             body = _strip_html(comment.get("body", "") or "")[:_PREVIEW_LEN]
             latest_ts = max(latest_ts, created)
-            updates.append(UpdateInfo(
-                update_type="comment",
-                title=f"[Комментарий] {question_title}",
-                author=author,
-                created_at=_fmt_unix(created),
-                preview=body,
-                new_timestamp=str(created),
-            ))
+            updates.append(
+                UpdateInfo(
+                    update_type="comment",
+                    title=f"[Комментарий] {question_title}",
+                    author=author,
+                    created_at=_fmt_unix(created),
+                    preview=body,
+                    new_timestamp=str(created),
+                )
+            )
 
         new_ts = str(latest_ts) if latest_ts != (since_ts or 0) else since
         return updates, new_ts

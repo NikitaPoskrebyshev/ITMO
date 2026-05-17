@@ -31,6 +31,10 @@ class BotApplication:
         server_port: int = 8081,
         db_dsn: str = "postgresql://bot:bot@localhost:5432/bot",
         db_access_type: str = "SQL",
+        notification_transport: str = "http",
+        kafka_bootstrap_servers: str = "localhost:9094",
+        kafka_topic: str = "link-updates",
+        kafka_group_id: str = "bot-service",
     ) -> None:
         self._token = token
         self._polling_timeout_seconds = polling_timeout_seconds
@@ -49,6 +53,10 @@ class BotApplication:
         self._server_port = server_port
         self._db_dsn = db_dsn
         self._db_access_type = db_access_type.upper()
+        self._notification_transport = notification_transport
+        self._kafka_bootstrap_servers = kafka_bootstrap_servers
+        self._kafka_topic = kafka_topic
+        self._kafka_group_id = kafka_group_id
 
     def build(self) -> Application:
         from telegram.ext import (
@@ -131,6 +139,26 @@ class BotApplication:
         )
         http_server = uvicorn.Server(config)
 
+        kafka_consumer = None
+        if self._notification_transport == "kafka":
+            from .kafka_consumer import KafkaUpdateConsumer
+
+            kafka_consumer = KafkaUpdateConsumer(
+                bootstrap_servers=self._kafka_bootstrap_servers,
+                topic=self._kafka_topic,
+                group_id=self._kafka_group_id,
+                on_update=self._on_update,
+            )
+            await kafka_consumer.start()
+            logger.info(
+                "kafka_consumer_started",
+                extra={
+                    "event": "kafka_consumer_started",
+                    "topic": self._kafka_topic,
+                    "bootstrap_servers": self._kafka_bootstrap_servers,
+                },
+            )
+
         async with application:
             await application.start()
             assert application.updater is not None
@@ -147,3 +175,5 @@ class BotApplication:
             finally:
                 await application.updater.stop()
                 await application.stop()
+                if kafka_consumer is not None:
+                    await kafka_consumer.stop()

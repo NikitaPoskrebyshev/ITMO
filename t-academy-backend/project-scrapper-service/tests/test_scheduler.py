@@ -77,13 +77,17 @@ async def test_scheduler_detects_update_and_notifies(
     sender: MagicMock,
     github_client: MagicMock,
 ) -> None:
-    github_client.get_updates = AsyncMock(return_value=([_UPDATE], "2024-02-01T12:00:00Z"))
+    github_client.get_updates = AsyncMock(
+        return_value=([_UPDATE], "2024-02-01T12:00:00Z")
+    )
     link = (await repository.get_all_links())[0]
 
     await scheduler._check_link(link)
 
     sender.send_update.assert_called_once()
-    assert (await repository.get_all_links())[0].last_known_update == "2024-02-01T12:00:00Z"
+    assert (await repository.get_all_links())[
+        0
+    ].last_known_update == "2024-02-01T12:00:00Z"
 
 
 async def test_scheduler_no_notification_when_no_updates(
@@ -139,7 +143,6 @@ async def test_scheduler_error_in_one_link_does_not_affect_others(
 
     await scheduler._process_all_links()
 
-    # Second link still processed
     assert sender.send_update.call_count >= 1
 
 
@@ -149,7 +152,9 @@ async def test_scheduler_sends_correct_chat_ids(
     sender: MagicMock,
     github_client: MagicMock,
 ) -> None:
-    github_client.get_updates = AsyncMock(return_value=([_UPDATE], "2024-02-01T12:00:00Z"))
+    github_client.get_updates = AsyncMock(
+        return_value=([_UPDATE], "2024-02-01T12:00:00Z")
+    )
     link = (await repository.get_all_links())[0]
 
     await scheduler._check_link(link)
@@ -164,8 +169,10 @@ async def test_scheduler_batch_processing(
     sender: MagicMock,
     github_client: MagicMock,
 ) -> None:
-    github_client.get_updates = AsyncMock(return_value=([_UPDATE], "2024-02-01T12:00:00Z"))
-    scheduler._batch_size = 1  # force multiple batches
+    github_client.get_updates = AsyncMock(
+        return_value=([_UPDATE], "2024-02-01T12:00:00Z")
+    )
+    scheduler._batch_size = 1
 
     await repository.register_chat(2)
     await repository.add_link(2, "https://github.com/octocat/Spoon-Knife", "github", [])
@@ -181,7 +188,9 @@ async def test_scheduler_notification_contains_title_and_author(
     sender: MagicMock,
     github_client: MagicMock,
 ) -> None:
-    github_client.get_updates = AsyncMock(return_value=([_UPDATE], "2024-02-01T12:00:00Z"))
+    github_client.get_updates = AsyncMock(
+        return_value=([_UPDATE], "2024-02-01T12:00:00Z")
+    )
     link = (await repository.get_all_links())[0]
 
     await scheduler._check_link(link)

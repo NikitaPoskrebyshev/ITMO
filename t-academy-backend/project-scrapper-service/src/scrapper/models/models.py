@@ -53,6 +53,7 @@ class LinkUpdate(BaseModel):
     id: int
     url: str
     description: str
+    author: str = ""
     tg_chat_ids: list[int] = Field(serialization_alias="tgChatIds")
 
 

@@ -73,13 +73,18 @@ class Scheduler:
             return
 
         for update in updates:
-            logger.info("update_detected", extra={"url": link.url, "type": update.update_type})
-            await self._sender.send_update(LinkUpdate(
-                id=abs(hash(link.url)),
-                url=link.url,
-                description=_format_description(link.url, update),
-                tg_chat_ids=list(link.chat_ids),
-          ))
+            logger.info(
+                "update_detected", extra={"url": link.url, "type": update.update_type}
+            )
+            await self._sender.send_update(
+                LinkUpdate(
+                    id=abs(hash(link.url)),
+                    url=link.url,
+                    description=_format_description(link.url, update),
+                    author=update.author,
+                    tg_chat_ids=list(link.chat_ids),
+                )
+            )
 
         if new_timestamp != link.last_known_update:
             await self._repository.update_link_state(link.url, new_timestamp)
@@ -115,7 +120,9 @@ class Scheduler:
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run())
-        logger.info("scheduler_started", extra={"interval_seconds": self._interval_seconds})
+        logger.info(
+            "scheduler_started", extra={"interval_seconds": self._interval_seconds}
+        )
 
     def stop(self) -> None:
         if self._task is not None:

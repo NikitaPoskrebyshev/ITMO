@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
+import pytest
 import respx
 
 from scrapper.clients.bot_client import BotClient
@@ -25,13 +26,29 @@ GITHUB_PR = {
     "body": "New feature",
     "pull_request": {},
 }
-SO_QUESTION = {"items": [{"title": "Why is Python slow?", "last_activity_date": 1706788800}]}
-SO_ANSWER = {"items": [{"owner": {"display_name": "alice"}, "creation_date": 1706788800, "body": "<p>" + "B" * 300 + "</p>"}]}
-SO_COMMENT = {"items": [{"owner": {"display_name": "bob"}, "creation_date": 1706788900, "body": "Good point"}]}
+SO_QUESTION = {
+    "items": [{"title": "Why is Python slow?", "last_activity_date": 1706788800}]
+}
+SO_ANSWER = {
+    "items": [
+        {
+            "owner": {"display_name": "alice"},
+            "creation_date": 1706788800,
+            "body": "<p>" + "B" * 300 + "</p>",
+        }
+    ]
+}
+SO_COMMENT = {
+    "items": [
+        {
+            "owner": {"display_name": "bob"},
+            "creation_date": 1706788900,
+            "body": "Good point",
+        }
+    ]
+}
 SO_EMPTY = {"items": []}
 
-
-# ─── GitHubClient ─────────────────────────────────────────────────────────────
 
 @respx.mock
 async def test_github_first_check_returns_no_updates() -> None:
@@ -102,8 +119,6 @@ async def test_github_preview_truncated_to_200() -> None:
     )
     assert len(updates[0].preview) == 200
 
-
-# ─── StackOverflowClient ──────────────────────────────────────────────────────
 
 @respx.mock
 async def test_stackoverflow_first_check_returns_no_updates() -> None:
@@ -201,8 +216,6 @@ async def test_stackoverflow_api_unavailable_returns_empty() -> None:
     assert updates == []
 
 
-# ─── BotClient ────────────────────────────────────────────────────────────────
-
 def _mock_http(response: MagicMock) -> AsyncMock:
     mock = AsyncMock()
     mock.__aenter__.return_value = mock
@@ -213,26 +226,48 @@ def _mock_http(response: MagicMock) -> AsyncMock:
 async def test_bot_client_sends_update(mocker) -> None:  # type: ignore[no-untyped-def]
     resp = MagicMock()
     resp.status_code = 200
-    mocker.patch("scrapper.clients.bot_client.httpx.AsyncClient", return_value=_mock_http(resp))
+    mocker.patch(
+        "scrapper.clients.bot_client.httpx.AsyncClient", return_value=_mock_http(resp)
+    )
     await BotClient(base_url="http://bot:8081").send_update(
-        LinkUpdate(id=1, url="https://github.com/x/y", description="update", tg_chat_ids=[42])
+        LinkUpdate(
+            id=1, url="https://github.com/x/y", description="update", tg_chat_ids=[42]
+        )
     )
 
 
-async def test_bot_client_non_2xx_does_not_raise(mocker) -> None:  # type: ignore[no-untyped-def]
+async def test_bot_client_5xx_raises_retryable_error(mocker) -> None:  # type: ignore[no-untyped-def]
+    from scrapper.clients.bot_client import BotClientRetryableError
+
     resp = MagicMock()
     resp.status_code = 500
-    mocker.patch("scrapper.clients.bot_client.httpx.AsyncClient", return_value=_mock_http(resp))
-    await BotClient(base_url="http://bot:8081").send_update(
-        LinkUpdate(id=1, url="https://github.com/x/y", description="update", tg_chat_ids=[42])
+    mocker.patch(
+        "scrapper.clients.bot_client.httpx.AsyncClient", return_value=_mock_http(resp)
     )
+    with pytest.raises(BotClientRetryableError):
+        await BotClient(base_url="http://bot:8081").send_update(
+            LinkUpdate(
+                id=1,
+                url="https://github.com/x/y",
+                description="update",
+                tg_chat_ids=[42],
+            )
+        )
 
 
-async def test_bot_client_http_error_does_not_raise(mocker) -> None:  # type: ignore[no-untyped-def]
+async def test_bot_client_connection_error_raises_retryable_error(mocker) -> None:  # type: ignore[no-untyped-def]
+    from scrapper.clients.bot_client import BotClientRetryableError
+
     mock = AsyncMock()
     mock.__aenter__.return_value = mock
-    mock.post.side_effect = httpx.HTTPError("connection refused")
+    mock.post.side_effect = httpx.RequestError("connection refused")
     mocker.patch("scrapper.clients.bot_client.httpx.AsyncClient", return_value=mock)
-    await BotClient(base_url="http://bot:8081").send_update(
-        LinkUpdate(id=1, url="https://github.com/x/y", description="update", tg_chat_ids=[42])
-    )
+    with pytest.raises(BotClientRetryableError):
+        await BotClient(base_url="http://bot:8081").send_update(
+            LinkUpdate(
+                id=1,
+                url="https://github.com/x/y",
+                description="update",
+                tg_chat_ids=[42],
+            )
+        )

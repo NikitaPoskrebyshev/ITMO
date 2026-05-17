@@ -24,3 +24,13 @@ async def client(app) -> AsyncClient:  # type: ignore[misc]
         transport=ASGITransport(app=app), base_url="http://test"
     ) as c:
         yield c
+
+
+@pytest.fixture(scope="session")
+def redis_url() -> str:
+    from testcontainers.redis import RedisContainer
+
+    with RedisContainer() as container:
+        host = container.get_container_host_ip()
+        port = container.get_exposed_port(6379)
+        yield f"redis://{host}:{port}"

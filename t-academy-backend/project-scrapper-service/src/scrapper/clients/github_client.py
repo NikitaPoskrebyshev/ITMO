@@ -25,7 +25,12 @@ class GitHubClient:
         self, owner: str, repo: str, since: str | None
     ) -> tuple[list[UpdateInfo], str | None]:
         url = _ISSUES_URL.format(owner=owner, repo=repo)
-        params = {"state": "all", "sort": "created", "direction": "desc", "per_page": 30}
+        params = {
+            "state": "all",
+            "sort": "created",
+            "direction": "desc",
+            "per_page": 30,
+        }
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.get(url, headers=_HEADERS, params=params)
@@ -48,21 +53,23 @@ class GitHubClient:
             for item in items:
                 created_at: str = item.get("created_at", "")
                 if created_at <= since:
-                    break  # sorted desc — stop at first non-new item
+                    break
                 is_pr = "pull_request" in item
                 kind = "PR" if is_pr else "Issue"
                 number = item.get("number", 0)
                 title = f"[{kind} #{number}] {item.get('title', '')}"
                 author = (item.get("user") or {}).get("login", "unknown")
                 body = (item.get("body") or "")[:_PREVIEW_LEN]
-                updates.append(UpdateInfo(
-                    update_type="pull_request" if is_pr else "issue",
-                    title=title,
-                    author=author,
-                    created_at=_fmt_iso(created_at),
-                    preview=body,
-                    new_timestamp=created_at,
-                ))
+                updates.append(
+                    UpdateInfo(
+                        update_type="pull_request" if is_pr else "issue",
+                        title=title,
+                        author=author,
+                        created_at=_fmt_iso(created_at),
+                        preview=body,
+                        new_timestamp=created_at,
+                    )
+                )
 
             new_ts = updates[0].new_timestamp if updates else since
             return updates, new_ts

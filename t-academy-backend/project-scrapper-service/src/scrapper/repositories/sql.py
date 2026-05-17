@@ -158,7 +158,9 @@ class SqlScrapperRepository(ScrapperRepository):
                     last_checked_at=row["last_checked_at"],
                 )
 
-    async def get_all_links(self, limit: int = 100, offset: int = 0) -> list[TrackedLink]:
+    async def get_all_links(
+        self, limit: int = 100, offset: int = 0
+    ) -> list[TrackedLink]:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
                 """

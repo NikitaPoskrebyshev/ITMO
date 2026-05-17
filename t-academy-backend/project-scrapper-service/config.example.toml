@@ -15,3 +15,46 @@ timeout_seconds = 10
 [database]
 dsn = "postgresql://scrapper:scrapper@localhost:5432/scrapper"
 access-type = "SQL"  # "SQL" or "ORM"
+
+[notification]
+transport = "kafka"  # "http" or "kafka"
+
+[notification.kafka]
+bootstrap_servers = "localhost:9094"
+topic = "link.raw-updates"
+
+[valkey]
+url = "redis://localhost:6379"
+ttl_seconds = 60
+
+[resilience.retry]
+max_attempts = 3
+backoff_seconds = 1.0
+backoff_strategy = "constant"   # "constant" or "exponential"
+backoff_multiplier = 2.0        # used only when backoff_strategy = "exponential"
+max_backoff_seconds = 60.0      # used only when backoff_strategy = "exponential"
+retryable_status_codes = [500, 502, 503, 504]
+
+[resilience.circuit_breaker]
+fail_max = 5
+reset_timeout_seconds = 30
+
+[resilience.rate_limit]
+requests_per_minute = 100
+
+[ai-agent]
+enabled = false
+
+[ai-agent.filtering]
+stop-words = ["spam", "ads", "promo"]
+excluded-authors = ["bot-user"]
+min-length = 20
+
+[ai-agent.summarization]
+threshold = 500
+
+[ai-agent.kafka]
+bootstrap_servers = "localhost:9094"
+raw_topic = "link.raw-updates"
+processed_topic = "link.processed-updates"
+group_id = "ai-agent"

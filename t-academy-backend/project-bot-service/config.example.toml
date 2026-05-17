@@ -13,3 +13,11 @@ port = 8081
 [database]
 dsn = "postgresql://bot:bot@localhost:5433/bot"
 access-type = "SQL"  # "SQL" or "ORM"
+
+[notification]
+transport = "kafka"  # "http" or "kafka"
+
+[notification.kafka]
+bootstrap_servers = "localhost:9094"
+topic = "link-updates"
+group_id = "bot-service"
