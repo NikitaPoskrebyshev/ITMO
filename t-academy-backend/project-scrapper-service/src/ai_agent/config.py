@@ -24,8 +24,29 @@ class AiAgentKafkaConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class PrioritizationConfig:
+    high_keywords: tuple[str, ...] = ("critical", "urgent", "breaking", "security")
+    low_keywords: tuple[str, ...] = ("minor", "typo", "chore", "docs")
+
+
+@dataclass(frozen=True, slots=True)
+class GroupingConfig:
+    window_ms: int = 30000
+
+
+@dataclass(frozen=True, slots=True)
+class YandexGPTConfig:
+    api_key: str = ""
+    folder_id: str = ""
+    model: str = "yandexgpt-lite/latest"
+
+
+@dataclass(frozen=True, slots=True)
 class AiAgentConfig:
     enabled: bool = False
     filtering: FilteringConfig = field(default_factory=FilteringConfig)
     summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
+    prioritization: PrioritizationConfig = field(default_factory=PrioritizationConfig)
+    grouping: GroupingConfig = field(default_factory=GroupingConfig)
     kafka: AiAgentKafkaConfig = field(default_factory=AiAgentKafkaConfig)
+    yandex_gpt: YandexGPTConfig | None = None

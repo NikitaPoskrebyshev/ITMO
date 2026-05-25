@@ -100,11 +100,32 @@ class AiAgentKafkaConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class PrioritizationConfig:
+    high_keywords: tuple[str, ...] = ("critical", "urgent", "breaking", "security")
+    low_keywords: tuple[str, ...] = ("minor", "typo", "chore", "docs")
+
+
+@dataclass(frozen=True, slots=True)
+class GroupingConfig:
+    window_ms: int = 30000
+
+
+@dataclass(frozen=True, slots=True)
+class YandexGPTConfig:
+    api_key: str = ""
+    folder_id: str = ""
+    model: str = "yandexgpt-lite/latest"
+
+
+@dataclass(frozen=True, slots=True)
 class AiAgentConfig:
     enabled: bool = False
     filtering: FilteringConfig = field(default_factory=FilteringConfig)
     summarization: SummarizationConfig = field(default_factory=SummarizationConfig)
+    prioritization: PrioritizationConfig = field(default_factory=PrioritizationConfig)
+    grouping: GroupingConfig = field(default_factory=GroupingConfig)
     kafka: AiAgentKafkaConfig = field(default_factory=AiAgentKafkaConfig)
+    yandex_gpt: YandexGPTConfig | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,7 +191,17 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
     ai_agent_raw = data.get("ai-agent", {})
     filtering_raw = ai_agent_raw.get("filtering", {})
     summarization_raw = ai_agent_raw.get("summarization", {})
+    prioritization_raw = ai_agent_raw.get("prioritization", {})
+    grouping_raw = ai_agent_raw.get("grouping", {})
     ai_agent_kafka_raw = ai_agent_raw.get("kafka", {})
+    yandex_gpt_raw = ai_agent_raw.get("yandex-gpt")
+    yandex_gpt = None
+    if yandex_gpt_raw is not None:
+        yandex_gpt = YandexGPTConfig(
+            api_key=yandex_gpt_raw.get("api_key", ""),
+            folder_id=yandex_gpt_raw.get("folder_id", ""),
+            model=yandex_gpt_raw.get("model", "yandexgpt-lite/latest"),
+        )
 
     return AppConfig(
         server=ServerConfig(
@@ -229,6 +260,21 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
             summarization=SummarizationConfig(
                 threshold=int(summarization_raw.get("threshold", 500)),
             ),
+            prioritization=PrioritizationConfig(
+                high_keywords=tuple(
+                    prioritization_raw.get(
+                        "high-keywords", ["critical", "urgent", "breaking", "security"]
+                    )
+                ),
+                low_keywords=tuple(
+                    prioritization_raw.get(
+                        "low-keywords", ["minor", "typo", "chore", "docs"]
+                    )
+                ),
+            ),
+            grouping=GroupingConfig(
+                window_ms=int(grouping_raw.get("window-ms", 30000)),
+            ),
             kafka=AiAgentKafkaConfig(
                 bootstrap_servers=ai_agent_kafka_raw.get(
                     "bootstrap_servers", "localhost:9094"
@@ -239,5 +285,6 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AppConfig:
                 ),
                 group_id=ai_agent_kafka_raw.get("group_id", "ai-agent"),
             ),
+            yandex_gpt=yandex_gpt,
         ),
     )
